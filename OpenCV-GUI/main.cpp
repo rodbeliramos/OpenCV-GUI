@@ -1,11 +1,22 @@
 #include "mainwindow.h"
 #include <QApplication>
+#include <QScreen>
 
 int main(int argc, char *argv[])
 {
-    QApplication a(argc, argv);
-    MainWindow w;
-    w.show();
+    QApplication openCV_GUI_App(argc, argv);
+    MainWindow mainWin;
+    mainWin.resize(800,600);
+    mainWin.setMinimumSize(800,600);
 
-    return a.exec();
+    QScreen *screen = QGuiApplication::primaryScreen();
+    QRect  screenGeometry = screen->geometry();
+    int height = screenGeometry.height();
+    int width = screenGeometry.width();
+
+    mainWin.move((width/2)-(400),(height/2)-300);
+    mainWin.setWindowTitle("OpenCV Gui");
+    mainWin.show();
+
+    return openCV_GUI_App.exec();
 }

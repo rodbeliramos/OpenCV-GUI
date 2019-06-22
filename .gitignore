@@ -1,5 +1,7 @@
 # Don't track content of these folders
 OpenCV-GUI/OpenCV-GUI.pro.user
+build-OpenCV-GUI-Desktop_Qt_5_12_3_GCC_64bit-Debug/
+*.autosave
 
 # Compiled source #
 ###################
@@ -24,3 +26,4 @@ OpenCV-GUI/OpenCV-GUI.pro.user
 #*.rar
 #*.tar
 #*.zip
+		
