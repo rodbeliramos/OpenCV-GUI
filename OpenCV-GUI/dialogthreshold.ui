@@ -40,6 +40,9 @@
            <property name="orientation">
             <enum>Qt::Vertical</enum>
            </property>
+           <property name="invertedAppearance">
+            <bool>true</bool>
+           </property>
            <property name="tickPosition">
             <enum>QSlider::TicksBelow</enum>
            </property>
@@ -57,7 +60,7 @@
             </sizepolicy>
            </property>
            <property name="text">
-            <string>Image</string>
+            <string>No Image Selected</string>
            </property>
            <property name="scaledContents">
             <bool>false</bool>
@@ -158,7 +161,7 @@
            </widget>
           </item>
           <item>
-           <widget class="QComboBox" name="comboBox">
+           <widget class="QComboBox" name="thresholdTypeComboBox">
             <property name="enabled">
              <bool>false</bool>
             </property>

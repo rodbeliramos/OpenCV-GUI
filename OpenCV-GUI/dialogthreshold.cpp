@@ -9,7 +9,9 @@ DialogThreshold::DialogThreshold(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::DialogThreshold),
     _thresholdLevel(127),
-    _thresholdMaxValue(255)
+    _thresholdMaxValue(255),
+    _thresholdType(0),
+    _analysedRow(0)
 {
     ui->setupUi(this);
 }
@@ -34,7 +36,7 @@ void DialogThreshold::receiveSelectedImage(int dequeIndex, std::deque<cv::Mat*> 
 
 void DialogThreshold::setup()
 {
-    ui->comboBox->setEnabled(true);
+    ui->thresholdTypeComboBox->setEnabled(true);
 
     ui->showOriginal->setEnabled(true);
     ui->showOriginal->setChecked(true);
@@ -45,8 +47,12 @@ void DialogThreshold::setup()
     ui->imageLineSlider->setMaximumHeight(_imageOriginal.rows);
     ui->imageLineSlider->setMaximum(_imageOriginal.rows-1);
     ui->imageLineSlider->setValue(_imageOriginal.rows/2);
+    _analysedRow = _imageOriginal.rows/2;
     connect(ui->imageLineSlider, SIGNAL(valueChanged(int)),
             this, SLOT(setAnalysedRow(int)));
+
+    connect(ui->thresholdTypeComboBox, SIGNAL(currentIndexChanged(int)),
+            this, SLOT(setThresholdType(int)));
 
     ui->maxLevelSlider->setEnabled(true);
     ui->maxLevelSpinBox->setEnabled(true);
@@ -66,11 +72,12 @@ void DialogThreshold::setup()
     connect(ui->thresholdLevelSlider, SIGNAL(valueChanged(int)),
             this, SLOT(setThresholdLevel(int)));
 
-    connect(ui->showOriginal, SIGNAL(clicked()), this, SLOT(selectImage()));
-    connect(ui->showGray, SIGNAL(clicked()), this, SLOT(selectImage()));
-    connect(ui->showProcessed, SIGNAL(clicked()), this, SLOT(selectImage()));
+    connect(ui->showOriginal, SIGNAL(clicked()), this, SLOT(updateAll()));
+    connect(ui->showGray, SIGNAL(clicked()), this, SLOT(updateAll()));
+    connect(ui->showProcessed, SIGNAL(clicked()), this, SLOT(updateAll()));
 
-    connect(this, SIGNAL(chartChanged()), this, SLOT(updateChart()));
+    connect(this, SIGNAL(parametersChanged()), this, SLOT(updateAll()));
+    connect(this, SIGNAL(processChanged()), this, SLOT(process()));
 
     ui->chartView->setFixedSize(300,300);
     /**
@@ -83,7 +90,7 @@ void DialogThreshold::setup()
     300    0
         0               300
     */
-    emit chartChanged();
+    emit parametersChanged();
     cvtColor(_imageOriginal, _imageGray, CV_BGR2GRAY);
     threshold(_imageGray,_imageProcessed,_thresholdLevel,_thresholdMaxValue,_thresholdType);
 
@@ -104,7 +111,7 @@ void DialogThreshold::updateImageView(cv::Mat mat)
         /** Number of matrix channels - gray = 1 BGR = 3*/
 
     if(_imageDepth == CV_8U && _imageChannels == 1){
-        line(_mat, CvPoint(0, mat.rows-_analysedRow), CvPoint(_mat.cols-1, _mat.rows-_analysedRow),
+        line(_mat, CvPoint(0, _analysedRow), CvPoint(_mat.cols-1, _analysedRow),
              255, 1, CV_AA, 0);
         image = QImage(static_cast<const unsigned char*>(_mat.data),
                         _mat.cols, _mat.rows,
@@ -112,7 +119,7 @@ void DialogThreshold::updateImageView(cv::Mat mat)
                         QImage::Format_Grayscale8);
 
     }else if (_imageDepth == CV_8U && _imageChannels == 3) {
-        line(_mat, CvPoint(0, _mat.rows-_analysedRow), CvPoint(_mat.cols-1, _mat.rows-_analysedRow),
+        line(_mat, CvPoint(0, _analysedRow), CvPoint(_mat.cols-1, _analysedRow),
              cvScalar(255,0,0), 1, CV_AA, 0);
         image = QImage(static_cast<const unsigned char*>(_mat.data),
                         _mat.cols, _mat.rows,
@@ -122,27 +129,81 @@ void DialogThreshold::updateImageView(cv::Mat mat)
     ui->imageView->setPixmap(QPixmap::fromImage(image));
 }
 
-void DialogThreshold::updateChart(){
+void DialogThreshold::updateChart(cv::Mat mat){
 
-    qDebug() << "updateChart()";
+    //qDebug() << "updateChart()";
     Mat chart = Mat(ui->chartView->width(),ui->chartView->height(),
                     CV_8UC3, cvScalar(255,255,255));
     int fontFace = FONT_HERSHEY_PLAIN;
     double fontScale = 1;
-    int thickness = 2;
+    int thickness = 1;
 
     // Chart's X Axis
-    line(chart, CvPoint(20, 280), CvPoint(280, 280), cvScalar(0,0,0), 1, CV_AA, 0);
+    line(chart, CvPoint(20, 280), CvPoint(280, 280), cvScalar(30,30,30), 1, CV_AA, 0);
     // Chart's Y Axis
-    line(chart, CvPoint(20, 280), CvPoint(20, 20), cvScalar(0,0,0), 1, CV_AA, 0);
+    line(chart, CvPoint(20, 280), CvPoint(20, 20), cvScalar(30,30,30), 1, CV_AA, 0);
 
     // Chart's value
-    putText(chart, " 0", CvPoint(5,295), fontFace, fontScale, cvScalar(0,0,0), thickness, 8);
-    putText(chart, "255", CvPoint(5,15), fontFace, fontScale, cvScalar(0,0,0), thickness, 8);
-    putText(chart, "end", CvPoint(290,295), fontFace, fontScale, cvScalar(0,0,0), thickness, 8);
+    putText(chart, " 0", CvPoint(5,295), fontFace, fontScale, cvScalar(30,30,30), thickness, 8);
+    putText(chart, "255", CvPoint(5,15), fontFace, fontScale, cvScalar(30,30,30), thickness, 8);
+    putText(chart, "col", CvPoint(270,295), fontFace, fontScale, cvScalar(30,30,30), thickness, 8);
 
-    // Histograms
+    // Histograms ( depends of the image selected )
+    if(mat.channels()==1){
+        int matCols = mat.cols;    //200
+        int chartW = 260;
+        int binW = 1;
+        int chartCol = 0;
 
+        if(matCols > chartW)
+            binW = matCols/chartW;
+
+        Point lastPoint;
+        for (int matCol = 0; matCol<matCols; matCol+=binW) {
+            int sum = 0;
+            for (int binCol = 0; binCol<binW; binCol++) {
+                sum += mat.at<uchar>(_analysedRow, matCol+binCol); //valor no pixel
+            }
+            int binVal = sum/binW;
+            Point point = Point(21+chartCol,280-binVal);
+            if(chartCol)
+                line(chart, lastPoint, point, cvScalar(0,0,0), 1, CV_AA, 0);
+            lastPoint = point;
+
+            chartCol++;
+        }
+    }
+
+    if(mat.channels()==3){
+        Vec3b intensity;
+        Point lastPoint;
+        vector<Scalar> colors = {Scalar(255,0,0), Scalar(0,255,0), Scalar(0,0,255)};  //BGR
+        int matCols = mat.cols;    //200
+        int chartW = 260;
+        int binW = 1;
+        int chartCol = 0;
+
+        if(matCols > chartW)
+            binW = matCols/chartW;
+
+        for (uint color=0; color<3; color++) {
+            chartCol = 0;
+            for (int matCol = 0; matCol<matCols; matCol+=binW) {
+                int sum = 0;
+                for (int binCol = 0; binCol<binW; binCol++) {
+                    intensity = mat.at<Vec3b>(_analysedRow, matCol+binCol); //valor no pixel
+                    sum+= intensity.val[color];
+                }
+                int binVal = sum/binW;
+                Point point = Point(21+chartCol,280-binVal);
+                if(chartCol)
+                    line(chart, lastPoint, point, colors[color], 1, CV_AA, 0);
+                lastPoint = point;
+
+                chartCol++;
+            }
+        }
+    }
 
     // Threshold Limits
     line(chart, CvPoint(21, 280-_thresholdMaxValue), CvPoint(279, 280-_thresholdMaxValue),
@@ -168,7 +229,8 @@ void DialogThreshold::setThresholdMaxValue(int val)
 {
     if(_thresholdMaxValue != val){
         _thresholdMaxValue = val;
-        emit chartChanged();
+        emit processChanged();
+        emit parametersChanged();
     }
 }
 
@@ -176,7 +238,8 @@ void DialogThreshold::setThresholdLevel(int val)
 {
     if(_thresholdLevel != val){
         _thresholdLevel = val;
-        emit chartChanged();
+        emit processChanged();
+        emit parametersChanged();
     }
 }
 
@@ -184,24 +247,39 @@ void DialogThreshold::setAnalysedRow(int val)
 {
     if(_analysedRow != val){
         _analysedRow = val;
-        emit selectImage(); //emit imageChanged();  imageChanged() -> updateImageView
+        emit parametersChanged(); //emit imageChanged();  imageChanged() -> updateImageView
     }
 }
 
-void DialogThreshold::selectImage(){
+void DialogThreshold::setThresholdType(int val){
+    if(_thresholdType != val){
+        _thresholdType = val;
+        emit processChanged();
+        emit parametersChanged();
+    }
+}
+
+void DialogThreshold::updateAll(){
     if(ui->showGray->isChecked()){
         updateImageView(_imageGray);
+        updateChart(_imageGray);
 
     } else if(ui->showOriginal->isChecked()){
         updateImageView(_imageOriginal);
+        updateChart(_imageOriginal);
 
     } else if (ui->showProcessed->isChecked()){
         updateImageView(_imageProcessed);
+        updateChart(_imageProcessed);
+
     } else {
         qDebug() << "Erro @selectImage()";
     }
 }
 
+void DialogThreshold::process(){
+    threshold(_imageGray,_imageProcessed,_thresholdLevel,_thresholdMaxValue,_thresholdType);
+}
 
 
 
