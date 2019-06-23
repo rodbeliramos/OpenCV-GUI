@@ -129,6 +129,8 @@ void DialogThreshold::updateImageView(cv::Mat mat)
                         static_cast<const int>(_mat.step),
                         QImage::Format_RGB888);
     }    
+    if(mat.cols>ui->imageView->maximumWidth())
+            image = image.scaledToWidth(ui->imageView->maximumWidth());
     ui->imageView->setPixmap(QPixmap::fromImage(image));
 }
 
@@ -155,7 +157,7 @@ void DialogThreshold::updateChart(cv::Mat mat){
     if(mat.channels()==1){
 
         int matCols = mat.cols;    //200
-        int chartW = 260;
+        int chartW = (ui->chartView->width()) - 42;
         int binW = 1;
         int chartCol = 0;
 
@@ -171,10 +173,12 @@ void DialogThreshold::updateChart(cv::Mat mat){
             for (int binCol = 0; binCol<binW; binCol++) {
                 sum += mat.at<uchar>(_analysedRow, matCol+binCol); //pixel value on imageGray
             }
-            int binVal = sum/binW;
-            Point point = Point(21+chartCol,280-binVal);
-            chartPoints.push_back(point);
-            chartCol++;
+            if(chartCol<chartW){
+                int binVal = sum/binW;
+                Point point = Point(21+chartCol,280-binVal);
+                chartPoints.push_back(point);
+                chartCol++;
+            }
         }
         chartPoints.push_back(Point(21+chartCol, 281));
         vector<vector<Point>> allCharts;
@@ -195,10 +199,12 @@ void DialogThreshold::updateChart(cv::Mat mat){
                 for (int binCol = 0; binCol<binW; binCol++) {
                     sum += _imageGray.at<uchar>(_analysedRow, matCol+binCol); //pixel value on imageGray
                 }
-                int binVal = sum/binW;
-                Point point = Point(21+chartCol,280-binVal);
-                grayPoints.push_back(point);
-                chartCol++;
+                if(chartCol<chartW){
+                    int binVal = sum/binW;
+                    Point point = Point(21+chartCol,280-binVal);
+                    grayPoints.push_back(point);
+                    chartCol++;
+                }
             }
             grayPoints.push_back(Point(21+chartCol, 281));
             vector<vector<Point>> grayChart;
@@ -216,12 +222,12 @@ void DialogThreshold::updateChart(cv::Mat mat){
         Point lastPoint;
         vector<Scalar> colors = {Scalar(255,0,0), Scalar(0,255,0), Scalar(0,0,255)};  //BGR
         int matCols = mat.cols;    //200
-        int chartW = 260;
+        int chartW = (ui->chartView->width()) - 42;
         int binW = 1;
         int chartCol = 0;
 
         if(matCols > chartW)
-            binW = matCols/chartW;
+            binW = (matCols/chartW);
 
         for (uint color=0; color<3; color++) {
             chartCol = 0;
@@ -231,13 +237,14 @@ void DialogThreshold::updateChart(cv::Mat mat){
                     intensity = mat.at<Vec3b>(_analysedRow, matCol+binCol); //valor no pixel
                     sum+= intensity.val[color];
                 }
-                int binVal = sum/binW;
-                Point point = Point(21+chartCol,280-binVal);
-                if(chartCol)
-                    line(chart, lastPoint, point, colors[color], 1, CV_AA, 0);
-                lastPoint = point;
-
-                chartCol++;
+                if(chartCol<chartW){
+                    int binVal = sum/binW;
+                    Point point = Point(21+chartCol,280-binVal);
+                    if(chartCol)
+                        line(chart, lastPoint, point, colors[color], 1, CV_AA, 0);
+                    lastPoint = point;
+                    chartCol++;
+                }
             }
         }
     }

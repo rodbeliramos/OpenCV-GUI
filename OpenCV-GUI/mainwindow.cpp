@@ -100,7 +100,7 @@ void MainWindow::setup()
     workerTrigger->moveToThread(thread);
 
     thread->start();
-    emit sendSetup(0);
+    emit sendSetup(0);  //camera select
 }
 
 void MainWindow::receiveFrame(QImage frame)

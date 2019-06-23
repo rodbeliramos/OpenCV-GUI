@@ -18,7 +18,8 @@ OpenCvWorker::~OpenCvWorker(){
 
 void OpenCvWorker::checkIfDeviceAlreadyOpened(const int device)
 {
-    if(cap->isOpened()) cap->release();
+    if(cap->isOpened())
+        cap->release();
     cap->open(device);
 }
 

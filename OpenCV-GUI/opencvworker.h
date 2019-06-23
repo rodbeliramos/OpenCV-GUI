@@ -17,7 +17,7 @@ class OpenCvWorker : public QObject
 private:
     Mat _frameOriginal;     // Original data
     Mat _frameProcessed;    // Data Processed
-    VideoCapture *cap;     // Video Capture
+    VideoCapture *cap;      // Video Capture
 
     bool status;            // To check if the device was opened properly
     bool toggleStream;      // To control the capturing
