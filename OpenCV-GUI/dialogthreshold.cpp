@@ -11,7 +11,10 @@ DialogThreshold::DialogThreshold(QWidget *parent) :
     _thresholdLevel(127),
     _thresholdMaxValue(255),
     _thresholdType(0),
-    _analysedRow(0)
+    _analysedRow(0),
+    _showOriginal(true),
+    _showGray(false),
+    _showProcessed(false)
 {
     ui->setupUi(this);
 }
@@ -144,12 +147,13 @@ void DialogThreshold::updateChart(cv::Mat mat){
     line(chart, CvPoint(20, 280), CvPoint(20, 20), cvScalar(30,30,30), 1, CV_AA, 0);
 
     // Chart's value
-    putText(chart, " 0", CvPoint(5,295), fontFace, fontScale, cvScalar(30,30,30), thickness, 8);
-    putText(chart, "255", CvPoint(5,15), fontFace, fontScale, cvScalar(30,30,30), thickness, 8);
-    putText(chart, "col", CvPoint(270,295), fontFace, fontScale, cvScalar(30,30,30), thickness, 8);
+    putText(chart, " 0", CvPoint(5,295), fontFace, fontScale, cvScalar(30,30,30), thickness, CV_AA);
+    putText(chart, "255", CvPoint(5,15), fontFace, fontScale, cvScalar(30,30,30), thickness, CV_AA);
+    putText(chart, "col", CvPoint(270,295), fontFace, fontScale, cvScalar(30,30,30), thickness, CV_AA);
 
     // Histograms ( depends of the image selected )
     if(mat.channels()==1){
+
         int matCols = mat.cols;    //200
         int chartW = 260;
         int binW = 1;
@@ -158,20 +162,53 @@ void DialogThreshold::updateChart(cv::Mat mat){
         if(matCols > chartW)
             binW = matCols/chartW;
 
-        Point lastPoint;
+        vector<Point> chartPoints;
+        chartPoints.push_back(Point(21,281));
+
         for (int matCol = 0; matCol<matCols; matCol+=binW) {
             int sum = 0;
+
             for (int binCol = 0; binCol<binW; binCol++) {
-                sum += mat.at<uchar>(_analysedRow, matCol+binCol); //valor no pixel
+                sum += mat.at<uchar>(_analysedRow, matCol+binCol); //pixel value on imageGray
             }
             int binVal = sum/binW;
             Point point = Point(21+chartCol,280-binVal);
-            if(chartCol)
-                line(chart, lastPoint, point, cvScalar(0,0,0), 1, CV_AA, 0);
-            lastPoint = point;
-
+            chartPoints.push_back(point);
             chartCol++;
         }
+        chartPoints.push_back(Point(21+chartCol, 281));
+        vector<vector<Point>> allCharts;
+        allCharts.push_back(chartPoints);
+        if(_showProcessed)
+            fillPoly(chart, allCharts, Scalar(100,100,255));
+        polylines(chart,allCharts,true,Scalar(0,0,0),1,CV_AA,0);
+
+        if(_showProcessed){
+            chartCol = 0;
+
+            vector<Point> grayPoints;
+            grayPoints.push_back(Point(21,281));
+
+            for (int matCol = 0; matCol<matCols; matCol+=binW) {
+                int sum = 0;
+
+                for (int binCol = 0; binCol<binW; binCol++) {
+                    sum += _imageGray.at<uchar>(_analysedRow, matCol+binCol); //pixel value on imageGray
+                }
+                int binVal = sum/binW;
+                Point point = Point(21+chartCol,280-binVal);
+                grayPoints.push_back(point);
+                chartCol++;
+            }
+            grayPoints.push_back(Point(21+chartCol, 281));
+            vector<vector<Point>> grayChart;
+            grayChart.push_back(grayPoints);
+
+            //fillPoly(chart, grayChart, Scalar(100,100,255));
+            polylines(chart,grayChart,true,Scalar(0,0,0),1,CV_AA,0);
+        }
+
+
     }
 
     if(mat.channels()==3){
@@ -207,7 +244,7 @@ void DialogThreshold::updateChart(cv::Mat mat){
 
     // Threshold Limits
     line(chart, CvPoint(21, 280-_thresholdMaxValue), CvPoint(279, 280-_thresholdMaxValue),
-         cvScalar(255,0,0), 1, CV_AA, 0);
+         cvScalar(50,255,50), 1, CV_AA, 0);
 
     line(chart, CvPoint(21, 280-_thresholdLevel), CvPoint(279, 280-_thresholdLevel),
             cvScalar(0,0,255), 1, CV_AA, 0);
@@ -261,14 +298,23 @@ void DialogThreshold::setThresholdType(int val){
 
 void DialogThreshold::updateAll(){
     if(ui->showGray->isChecked()){
+        _showOriginal = false;
+        _showGray = true;
+        _showProcessed = false;
         updateImageView(_imageGray);
         updateChart(_imageGray);
 
     } else if(ui->showOriginal->isChecked()){
+        _showOriginal = true;
+        _showGray = false;
+        _showProcessed = false;
         updateImageView(_imageOriginal);
         updateChart(_imageOriginal);
 
     } else if (ui->showProcessed->isChecked()){
+        _showOriginal = false;
+        _showGray = false;
+        _showProcessed = true;
         updateImageView(_imageProcessed);
         updateChart(_imageProcessed);
 
